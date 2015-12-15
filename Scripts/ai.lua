@@ -13,9 +13,9 @@ local aiUserData = {		--default fallbacks in case a function is not created by t
 
 local sandbox = require("Scripts/sandbox")
 
--- maximum times that the script may run (in seconds)
-local MAX_LINES_LOADING = 50000
-local MAX_LINES_EXECUTING = 5000
+-- maximum number of instructions that the script may run
+local MAX_LINES_LOADING = 200000
+local MAX_LINES_EXECUTING = 20000
 
 local coLoad = nil
 linesUsed = 0
@@ -32,19 +32,17 @@ function newLineCountHook( maxLines )
 	linesUsed = 0
 	ai_currentLines = lines
 	ai_currentMaxLines = maxLines
-	return function ( event, l )
-		if event == "line" then
-			lines = lines + 1
-			linesUsed = linesUsed + 1
-			time = love.timer.getTime()
-			if lines == maxLines then
-				err = {msg="Taking too long, stopping. Time taken: " .. math.floor((time-startTime)*1000000)/1000 .. " ms."}
-				setmetatable(err, hookfunctionMetatable)
-				error(err)
-			end
-			ai_currentLines = lines
-			ai_currentMaxLines = maxLines
+	return function ( event )
+		lines = lines + 1
+		linesUsed = linesUsed + 1
+		time = love.timer.getTime()
+		if lines == maxLines then
+			err = {msg="Taking too long, stopping. Time taken: " .. math.floor((time-startTime)*1000000)/1000 .. " ms."}
+			setmetatable(err, hookfunctionMetatable)
+			error(err)
 		end
+		ai_currentLines = lines
+		ai_currentMaxLines = maxLines
 	end
 end
 
@@ -80,7 +78,7 @@ end
 local function safelyLoadAI(chunk, scriptName, sb)
 
 	print("\tCompiling code...")
-	debug.sethook(newLineCountHook(MAX_LINES_LOADING), "l")
+	debug.sethook(newLineCountHook(MAX_LINES_LOADING), "", 1)
 	local func, message = loadstring( "TRAINSPORTED = true;" .. chunk, scriptName)
 	debug.sethook()
 	if not func then
@@ -94,7 +92,7 @@ local function safelyLoadAI(chunk, scriptName, sb)
 	
 	print("\tRunning code:")
 	func = setfenv(func, sb)
-	debug.sethook(newLineCountHook(MAX_LINES_LOADING), "l")
+	debug.sethook(newLineCountHook(MAX_LINES_LOADING), "", 1)
 	local ok, message = xpcall(func, traceback)
 	if not ok then
 		--print("Could not execute script: \n", message)
@@ -110,7 +108,7 @@ end
 local socket = require("socket")
 function runAiFunctionCoroutine(f, lines, ... )
 	--local t = socket.gettime()
-	debug.sethook(newLineCountHook(lines), "l")
+	debug.sethook(newLineCountHook(lines), "", 1)
 
 	args = {...}
 	local ok, msg = xpcall(function() return f( unpack(args) ) end, traceback)
